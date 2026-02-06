@@ -229,7 +229,10 @@ for(fold in 1:10){
 
 barplot(rmse_results, names.arg = 1:10, main = "RMSE by Fold", 
         xlab = "Fold", ylab = "RMSE", col = "steelblue")
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1c12c4c9e4be252ee0e70a9fb505a7328b0433ad
 ```
 
 
