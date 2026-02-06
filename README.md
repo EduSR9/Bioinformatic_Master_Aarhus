@@ -20,7 +20,7 @@ This repository contains coursework and projects organized by semester.
 ### 🔹 [Computational Thinking](semester-1/computational-thinking)
 Foundational programming and algorithmic thinking for bioinformatics. Covers data structures, algorithm design, and basic sequence analysis.
 
-### 🔹 [Data Science](semester-1/data-science-in-bioinformatics)
+### 🔹 [Data Science in Bioinformatics](semester-1/data-science-in-bioinformatics)
 Introduction to probability theory, statistical inference, and data analysis methods for biological datasets using R.
 
 ### 🔹 [Evolutionary Thinking](semester-1/evolutionary-thinking)
@@ -28,13 +28,13 @@ Evolutionary principles, phylogenetics, and population genetics through computat
 
 ## 📂 [Semester 2](semester-2)
 
-### 🔹 [Algorithms](semester-2/algorithms-in-bioinformatics)
+### 🔹 [Algorithms in Bioinformatics](semester-2/algorithms-in-bioinformatics)
 Advanced algorithmic solutions for biological sequence analysis including dynamic programming, HMMs, suffix trees, and phylogenetic methods.
 
-### 🔹 [Stat & ML](semester-2/statistical-and-machine-learning-in-bioinformatics)
+### 🔹 [Statistical & Machine learning in Bioinformatics](semester-2/statistical-and-machine-learning-in-bioinformatics)
 Statistical inference and machine learning for genomic data, including regression, classification, dimensionality reduction, and hypothesis testing.
 
-### 🔹 [HPC](semester-2/high-performance-computing-for-data-analysis)
+### 🔹 [High Performance Computing for Data Analysis](semester-2/high-performance-computing-for-data-analysis)
 Scalable computational approaches for big genomic data using parallelization, cluster computing, and optimization techniques.
 
 ## 📂 [Semester 3](semester-3)
