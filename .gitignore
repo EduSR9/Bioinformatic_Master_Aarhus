@@ -2,6 +2,12 @@
 .Rhistory
 .Rapp.history
 
+# Large data files
+*.fastq
+*.bam
+*.vcf
+*.gz
+
 # Session Data files
 .RData
 .RDataTmp
