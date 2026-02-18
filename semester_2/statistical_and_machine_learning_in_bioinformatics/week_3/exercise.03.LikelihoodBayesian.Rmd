@@ -96,14 +96,17 @@ The function of theta that returns for a dataset where $k$ observations
 in a given category out of $n$ observations
 
 ```{r}
-loglikelihood <- function(k, n){
-  sampling <- c()
-  for (teta in seq(0, 1, length.out = 1000)){
-    likeli <- dbinom(k, n, teta, log = TRUE)
-    sampling[teta] <- dbinom
-    }
+loglikelihood <- function(k, n, teta_vector){
+  return(dbinom(k, n, teta_vector, log = T))
 }
-loglikelihood(40,300,40/300)
+possible_thetas <- seq(0, 1, by = 0.001)
+x <- loglikelihood(40, 300, possible_thetas)
+theta_df <- data.frame(theta = possible_thetas, likelihood = x)
+
+ggplot(theta_df, aes(x = theta, y = x)) +
+  geom_line() +
+  labs(x = "Theta",
+       y = "Log-likelihood")
 ```
 
 ------------------------------------------------------------------------
@@ -167,7 +170,7 @@ vectorized so you can pass as argument to for instance prob a single
 number (that will be reused `n` times or a vector):
 
 ```{r}
-rtheta <- rbeta(n = 100000, shape1 = 5, shape2 = 35)
+rtheta <- rbeta(n = 10000, shape1 = 5, shape2 = 35)
 hist(rtheta) #quick and dirty plot on a vector
 
 y <- rbinom(n = length(rtheta), prob =  rtheta, size = 300)
@@ -182,7 +185,14 @@ Can you explain to your team mate how are these two vectors
 
 -   `y`
 
+    y represents the number of people that would have that virus variant
+    out of 300 in different scenarios where the probability of having
+    that variant varies depending on which rtheta are we.
+
 -   `rtheta`
+
+    rtheta are all 10.000 plausible values of frequencies of that
+    genetic variant
 
 related to $P(D)$ and $P(\theta)$ in the notes on Bayesian inference and
 the celebrated formula :
@@ -205,6 +215,11 @@ simulate 1 dataset ( a yobs).
 
 Use the (sub) set of simulations (stored in `y`) to approximate the
 posterior, "by conditioning on the data" .
+
+```{r}
+posterior <- rtheta[y == 40]
+(mean(posterior))
+```
 
 ## Q4: Superimpose / compare with the theoretical posterior
 
@@ -234,6 +249,18 @@ What is the posterior probability that the variant frequency is:
 -   less than 10% ? (we got it moderate wrong)
 -   more than 20% (we got it completely wrong)
 
+```{r}
+df_posterior <- data.frame(theta = posterior)
+ggplot(df_posterior, aes(theta)) + 
+  geom_histogram()
+
+less10prob <- length(posterior[posterior < 0.1])/length(posterior) * 100
+more20prob <- length(posterior[posterior > 0.2])/length(posterior) * 100
+
+credible_interval <- quantile(posterior, probs = c(0.025, 0.975))
+
+```
+
 ------------------------------------------------------------------------
 
 ## Exploring sensitivity to the choice of prior
@@ -241,6 +268,36 @@ What is the posterior probability that the variant frequency is:
 ## Q6: Redo the Bayesian analysis replacing our original prior with a softer prior (less peaked), meaning that we use less prior information.
 
 How much does this change the final result?
+
+The use of a softer, less peaked prior (e.g., $Beta(5, 35)$) reflects a
+lower level of prior certainty, which allows the observed data to have a
+stronger influence on the final result. Consequently, the credible
+interval becomes broader and shifts closer to the sample proportion,
+representing the increased uncertainty inherent in having fewer prior
+"counts".
+
+```{r}
+new_rtheta <- rbeta(n = 100000, shape1 = 1, shape2 = 7)
+
+hist(new_rtheta) #quick and dirty plot on a vector
+
+new_y <- rbinom(n = length(new_rtheta), prob =  new_rtheta, size = 300)
+
+hist(new_y, breaks = 50, col = "orange", main = "", xlab = "Yos", probability = T)
+
+new_posterior <- new_rtheta[y == 40]
+(mean(new_posterior))
+
+df_new_posterior <- data.frame(theta = new_posterior)
+ggplot(df_new_posterior, aes(theta)) + 
+  geom_histogram()
+
+less10prob <- length(new_posterior[new_posterior < 0.1])/length(new_posterior) * 100
+more20prob <- length(new_posterior[new_posterior > 0.2])/length(new_posterior) * 100
+
+credible_interval <- quantile(new_posterior, probs = c(0.025, 0.975))
+
+```
 
 ------------------------------------------------------------------------
 
@@ -251,6 +308,29 @@ flat prior ?
 
 > Discuss how much weight a flat prior has in the posterior distribution
 
+```{r}
+new_rtheta <- rbeta(n = 100000, shape1 = 1, shape2 = 1)
+
+hist(new_rtheta) #quick and dirty plot on a vector
+
+new_y <- rbinom(n = length(new_rtheta), prob =  new_rtheta, size = 300)
+
+hist(new_y, breaks = 50, col = "orange", main = "", xlab = "Yos", probability = T)
+
+new_posterior <- new_rtheta[y == 40]
+(mean(new_posterior))
+
+df_new_posterior <- data.frame(theta = new_posterior)
+ggplot(df_new_posterior, aes(theta)) + 
+  geom_histogram()
+
+less10prob <- length(new_posterior[new_posterior < 0.1])/length(new_posterior) * 100
+more20prob <- length(new_posterior[new_posterior > 0.2])/length(new_posterior) * 100
+
+credible_interval <- quantile(new_posterior, probs = c(0.025, 0.975))
+
+```
+
 ## Inference using solely the Likelihood principle
 
 Write the likelihood function for the data as a function of $\theta$ and
@@ -259,8 +339,8 @@ visualize it as a function of the proportion $\theta$.
 Can you also approximate the (rescaled) likelihood by using the
 simulations for a given $f(\theta)$ ? Hint if you use a "completely
 flat" prior you expect that it will be essentially like a likelihood
-analysis. But you can also all $N$ simulations for a given
-\theta interval, count how many simulations yielded a given $y_{obs}$
+analysis. But you can also all $N$ simulations for a given \theta
+interval, count how many simulations yielded a given $y_{obs}$
 ($n_{y_{obs}$) and approximate the likelihood as
 
 $$ Prob(Y=y_{obs}|\theta) \approx \frac{n_{y_{obs}}}{N} $$:
@@ -287,6 +367,44 @@ sims %>%
   filter(thetas > 0.09) %>%
   tally()
 
+27/1565
+
+theta_grid <- seq(0.05, 0.25, by = 0.01)
+get_likelihood <- function(t_center) {
+  epsilon <- 0.025
+  
+  # Total simulations within the theta interval (N)
+  N <- sims %>%
+    filter(thetas > (t_center - epsilon) & thetas < (t_center + epsilon)) %>%
+    tally() %>% 
+    pull(n)
+  # Simulations where yobs == 40 within that interval (n_yobs)
+  n_yobs <- sims %>%
+    filter(yobs == 40) %>%
+    filter(thetas > (t_center - epsilon) & thetas < (t_center + epsilon)) %>%
+    tally() %>% 
+    pull(n)
+  
+  # Approximate Likelihood: n_yobs / N
+  return(n_yobs / N)
+}
+
+likelihood_results <- data.frame(
+  theta = theta_grid,
+  likelihood = sapply(theta_grid, get_likelihood)
+)
+
+ggplot(likelihood_results, aes(x = theta, y = likelihood)) +
+  geom_line(color = "firebrick", size = 1, alpha = 0.6) +
+  geom_point(color = "firebrick") +
+  
+  stat_function(fun = function(x) dbinom(40, size = 300, prob = x), 
+                color = "blue", size = 1, linetype = "dashed") +
+  
+  labs(title = "Comparison likelihood, simulated vs theoretical binomial",
+       subtitle = "Red: Sim (ABC) | Dotted blue: theoretical bin",
+       x = expression(theta), y = "L(theta)") +
+  theme_minimal()
 ```
 
 Then you reuse that idea to get the likelihood over a grid of values...
