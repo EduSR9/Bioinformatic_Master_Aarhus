@@ -13,17 +13,17 @@ editor_options:
   chunk_output_type: inline
 ---
 
-# Goal of the session 
+# Goal of the session
 
-* Get familiarized with how over fitting in n>p or n<<p works 
+-   Get familiarized with how over fitting in n\>p or n\<\<p works
 
-* Exploring the tcga dataset
+-   Exploring the tcga dataset
 
-* Exploring logistic regression and its use as for predicting tissue type (Normal or Cancerous) in the tcga dataset
+-   Exploring logistic regression and its use as for predicting tissue type (Normal or Cancerous) in the tcga dataset
 
-* Gearing up for submitting your first set of predictions on cancer 
+-   Gearing up for submitting your first set of predictions on cancer
 
-# A fake dataset with no signal 
+# A fake dataset with no signal
 
 ```{r}
 library(tidyverse)
@@ -51,7 +51,7 @@ pseudo_df %>% select(1:6) %>% head() %>% kable("pandoc", digits = 2)
 
 # A bit of tidyverse magic with `pivot_longer`
 
-First reorganize, amd lets pretend these features are gene expression data, typically expressed on log scale because gene expression ca vary byr 2-3 orders of magnitude.
+First reorganize, and lets pretend these features are gene expression data, typically expressed on log scale because gene expression can vary by 2-3 orders of magnitude.
 
 ```{r}
 df_longer <- pivot_longer(data = pseudo_df,
@@ -62,6 +62,7 @@ head(df_longer) %>% knitr::kable(digits = 2)
 ```
 
 Then summarize by gene:
+
 ```{r}
 stats_byFeature_by_treatment <-df_longer %>%
   group_by(Feature,response) %>%
@@ -72,9 +73,9 @@ stats_byFeature_by_treatment <-df_longer %>%
 head(stats_byFeature_by_treatment) %>% knitr::kable(digits = 2)
 ```
 
-# More tidyverse  with `pivot_wider`
+# More tidyverse with `pivot_wider`
 
-and this time pivot wider ... to build a series of summaries per features ... 
+and this time pivot wider ... to build a series of summaries per features ...
 
 ```{r}
 summary_features <-pivot_wider(data = stats_byFeature_by_treatment, 
@@ -87,7 +88,7 @@ head(summary_features) %>% knitr::kable(digits = 2)
 
 # A standardized difference approach - aka the `t-test`
 
-This is the most celebrated statistic to look at differences between 2 groups 
+This is the most celebrated statistic to look at differences between 2 groups
 
 ```{r}
 summary_features  <- summary_features %>%
@@ -128,6 +129,7 @@ ggplot(pseudo_df, aes(x=V1608, y = V3630, color = reponse_binary)) +
   NULL
 
 ```
+
 # Predicting after cherry picking 2/n
 
 ```{r}
@@ -149,35 +151,72 @@ ggplot(data = pseudo_df, aes(x=magic, fill = reponse_binary)) +
 
 # Predicting after cherry picking 3/n
 
-## >Q00 explore how much prediction can be achieved using 5-10 carefully chosen predictors
+## \>Q00 explore how much prediction can be achieved using 5-10 carefully chosen predictors
 
-# Background on the  TCGA data 
+```{r}
+m1 <- glm(data = pseudo_df, formula = logistic01 ~ V1608 + V3630 + V2976 + V5864 + V1709 + V1777 + V148 + V9460 + V287 + V7702 ,  family = "binomial" )
+m0 <- glm(data = pseudo_df, formula = logistic01 ~ 1,  family = "binomial" )
+(1 - m1$deviance/m0$deviance)
 
-* The dataset we work on for the next weeks is a slice of the original tcga gene expression dataset. More precisely, here we use a random subset of 4000 genes out of ca 18000 genes from the initial dataset.
+pseudo_df$magic <-m1$fitted.values
+ggplot(data = pseudo_df, aes(x=magic, fill = reponse_binary)) + 
+  geom_dotplot(binwidth = 0.0150)+ 
+  scale_fill_colorblind()+
+  xlab("2 logistic regression predictors") +
+  NULL
+```
 
-* Each individual sample (`rowid`) has a matching metadata where a sample type (`reponse`: Normal / Cancer) are given along with a `tissue` type ( for the training part of the data)
+```{r}
+# Splitting the data: 80% for training, 20% for testing
+set.seed(123)
+train_idx <- sample(1:nrow(pseudo_df), size = 0.8 * nrow(pseudo_df))
+train_data <- pseudo_df[train_idx, ]
+test_data  <- pseudo_df[-train_idx, ]
 
-* The gene expression data comprising 4000 genes where log10(gene expression) is provided + 3 first principal components (aka `pc1`  `pc2` `pc3`)
+# Training the model ONLY using the training data
+m_train <- glm(data = train_data, 
+               formula = logistic01 ~ V1608 + V3630 + V2976 + V5864 + V1709 + V1777 + V148 + V9460 + V287 + V7702, 
+               family = "binomial")
 
-* About the PCs: `pc1` and `pc2` these 2 synthetic variables are orthogonal and account for ca 20% of the total variation in gene expression in the 4000 genes we use for prediction
+# Prediction outcomes for the TEST data
+test_predictions <- predict(m_train, newdata = test_data, type = "response")
+
+# Plot the TEST results
+test_results <- tibble(prob = test_predictions, real = test_data$reponse_binary)
+
+ggplot(test_results, aes(x = prob, fill = real)) +
+  geom_dotplot(binwidth = 0.05) +
+  scale_fill_colorblind() +
+  labs(title = "Predictions on UNSEEN data (Test Set)", 
+       x = "Predicted Probability", 
+       fill = "Actual Status") +
+  theme_minimal()
+```
+
+# Background on the TCGA data
+
+-   The dataset we work on for the next weeks is a slice of the original tcga gene expression dataset. More precisely, here we use a random subset of 4000 genes out of ca 18000 genes from the initial dataset.
+
+-   Each individual sample (`rowid`) has a matching metadata where a sample type (`reponse`: Normal / Cancer) are given along with a `tissue` type ( for the training part of the data)
+
+-   The gene expression data comprising 4000 genes where log10(gene expression) is provided + 3 first principal components (aka `pc1` `pc2` `pc3`)
+
+-   About the PCs: `pc1` and `pc2` these 2 synthetic variables are orthogonal and account for ca 20% of the total variation in gene expression in the 4000 genes we use for prediction
 
 IMPORTANT: for some samples (1172 of them) the nature of the tissue (`reponse`) is not known (`NA`) and should be predicted (we will try various methods to do so this week and in the coming weeks)
 
-
 # 1. Loading the data:
 
-We will load the dataset 
-The file is a tible saved in R's rds format (with gz compression). Rds is the fastest format for writing and reading.
+We will load the dataset The file is a tible saved in R's rds format (with gz compression). Rds is the fastest format for writing and reading.
 
 Each row is one biological sample (one persons tissue)
 
-It contains info on the sample and pc1, pc2 and log10(1 + gene expression) data. 
+It contains info on the sample and pc1, pc2 and log10(1 + gene expression) data.
 
-You will se that the response is unknown/missing for some of the samples (~20 percent of the data).
+You will se that the response is unknown/missing for some of the samples (\~20 percent of the data).
 
-The response column is recoded for the logictic regression:  
-* 0 = `Normal`, 
-* 1 = `Tumor`
+The response column is recoded for the logictic regression:\
+\* 0 = `Normal`, \* 1 = `Tumor`
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -205,74 +244,58 @@ tcgadf %>%
 
 ```
 
-## > Q0: First, think about the "structure" of the data: 
+## \> Q0: First, think about the "structure" of the data:
 
-* What are the predictors ?  
-* what is the response variable you are interested in ? 
-* Are we in the n>>p, n>p, n~p, n<p or n<<p "domain"  ?
+-   What are the predictors ?\
+-   what is the response variable you are interested in ?
+-   Are we in the n\>\>p, n\>p, n\~p, n\<p or n\<\<p "domain" ?
 
 # 2. vizualizing the TCGA dataset
 
-## > Q1: Do some simple graphical visualizations, 
+## \> Q1: Do some simple graphical visualizations,
 
 Explore to see how 2 gene expression levels or 2 pc of gene expression differ by Tissue and SampleType
 
-
-
----
+------------------------------------------------------------------------
 
 > Q: draw "by eye" the boundaries between types (Normal / cancer) and tissue type
 
 # 3. Formatting preparing the data for using the classification methods
 
+## \> Q2: build a training set by filtering the data so you only have samples with SampleType known
 
-## > Q2: build a training set by filtering the data so you only have samples with SampleType known
-
-
----
-
+------------------------------------------------------------------------
 
 # Part 4: Trying out classification methods
 
 Try out the logistic regression on the tcga dataset. If you are unsure about the R function glm() that is implementing logistic regression, then lookup the R labs of the classification chapter.
 
+## \> Q3: Can you identify specific genes that are good at discriminating between types (normal / Cancer) overall and within a specific tissue ?
 
-## > Q3: Can you identify specific genes that are good at discriminating between types (normal / Cancer) overall and within a specific tissue ? 
+## \> Q4: Explore how pc1 and pc2 can effectively summarize the info of 500 gene expression measurements
 
-
-## > Q4: Explore how pc1 and pc2 can effectively summarize the info of 500 gene expression measurements 
-
-
-
-## > Q5: try and combine up to max 3 predictors to make your classification .. 
+## \> Q5: try and combine up to max 3 predictors to make your classification ..
 
 To start, by limiting the number of predictors, the model is more easy to "interpret". Later on we will go "bananas" and increase the number of predictors if it is sensible to do so (see cross validation and model selection inthe coming weeks )
 
+------------------------------------------------------------------------
 
+Hint: you could try to use the `broom` package and use that to organize the results of different models.
 
----
+Note that the statistics computed by glance are different for `glm()` objects than for `lm()` (e.g. deviance rather than R\^2 are reported). make sure you understand these terms and if in doubt ask your TA :)
 
-Hint: you could try  to use the `broom` package and use that to organize the results of different models.
+------------------------------------------------------------------------
 
-Note that the statistics computed by glance are different for `glm()` objects than for `lm()` (e.g. deviance rather than R^2 are reported). make sure you understand these terms and if in doubt ask your TA :)
+# Part 5. looking at model fit
 
-
-
----
-
-# Part 5. looking at model fit 
-
-##> Q6: Make some visual presentation of the  glm fit
+##\> Q6: Make some visual presentation of the glm fit
 
 use `ggplot()` to produce the equivalent of figure 4.2 of the book for the logistic regression model you chose.
 
 Hint: if you still struggle with all the arcane options of `ggplot()` try this post :)
 
-https://stackoverflow.com/questions/47080625/plotting-predictions-from-a-logistic-regression
+<https://stackoverflow.com/questions/47080625/plotting-predictions-from-a-logistic-regression>
 
- 
----
+------------------------------------------------------------------------
 
-# Well done! TOu are almost ready tomake your first round of predictions ?? !!
-
-
+# Well done! TOu are almost ready to make your first round of predictions ?? !!
