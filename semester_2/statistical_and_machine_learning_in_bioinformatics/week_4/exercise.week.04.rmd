@@ -221,7 +221,7 @@ The response column is recoded for the logictic regression:\
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 getwd()
-tcgadf <- read_rds("../datasets/TCGA_cancer_classification/miniTCGA.3349x4006.rds") 
+tcgadf <- read_rds("datasets/TCGA_cancer_classification/miniTCGA.3349x4006.rds") 
 
 dim(tcgadf) # check this should be 3349 4007
 names(tcgadf)[1:30]
@@ -247,14 +247,45 @@ tcgadf %>%
 ## \> Q0: First, think about the "structure" of the data:
 
 -   What are the predictors ?\
+    The predictors (also known as independent variables or features) are the **gene expression levels** and the principal components (**PC1, PC2**).
+
+    -   In this dataset, each column (except for `response` and `sampletype`) represents a genomic feature, specifically the $log_{10}(1 + \text{gene expression})$ values for thousands of different genes.
+
 -   what is the response variable you are interested in ?
+
+    The response variable is **`response`**.
+
+    -   It is a **binary categorical variable** that has been recoded into numerical values for the logistic regression: **0** for `Normal` tissue and **1** for `Tumor` tissue.
+
 -   Are we in the n\>\>p, n\>p, n\~p, n\<p or n\<\<p "domain" ?
+
+    We are in the $n \ll p$ domain (where $n$ is much smaller than $p$).
 
 # 2. vizualizing the TCGA dataset
 
 ## \> Q1: Do some simple graphical visualizations,
 
 Explore to see how 2 gene expression levels or 2 pc of gene expression differ by Tissue and SampleType
+
+```{r}
+tcgadf_no_na <- subset(tcgadf, !is.na(tissue))
+
+tcgadf_clean <- tcgadf_no_na %>%
+  mutate(sample_type = case_when(
+    response == 0 ~ "Normal",
+    response == 1 ~ "Tumor"
+  ))
+
+ggplot(tcgadf_clean, aes(x = tissue, y = pc1, fill = sample_type)) +
+  geom_boxplot()+
+  scale_fill_manual(values = c("Normal" = "green", "Tumor" = "red")) +
+  labs(title = "PC1 by tissue")
+
+ggplot(tcgadf_clean, aes(x = tissue, y = pc2, fill = sample_type)) +
+  geom_boxplot()+
+  scale_fill_manual(values = c("Normal" = "green", "Tumor" = "red")) +
+  labs(title = "PC1 by tissue")
+```
 
 ------------------------------------------------------------------------
 
@@ -264,6 +295,18 @@ Explore to see how 2 gene expression levels or 2 pc of gene expression differ by
 
 ## \> Q2: build a training set by filtering the data so you only have samples with SampleType known
 
+```{r}
+# 1. Create the training set by removing rows with unknown SampleType
+training_set <- tcgadf_clean %>%
+  filter(!is.na(sample_type))
+
+# 2. Check how many samples we have left
+nrow(training_set)
+
+# 3. See the distribution of Normal vs Tumor
+table(training_set$sample_type)
+```
+
 ------------------------------------------------------------------------
 
 # Part 4: Trying out classification methods
@@ -271,6 +314,36 @@ Explore to see how 2 gene expression levels or 2 pc of gene expression differ by
 Try out the logistic regression on the tcga dataset. If you are unsure about the R function glm() that is implementing logistic regression, then lookup the R labs of the classification chapter.
 
 ## \> Q3: Can you identify specific genes that are good at discriminating between types (normal / Cancer) overall and within a specific tissue ?
+
+```{r}
+library(tidyr)
+library(dplyr)
+
+long_data <- training_set %>%
+  pivot_longer(
+    cols = -any_of(c("rowid", "response", "tissue", "pc1", "pc2", "pc3", "sample_type", "sampletype")), 
+    names_to = "gene",
+    values_to = "expression"
+  )
+
+summary_overall <- long_data %>%
+  group_by(gene) %>%
+  summarise(
+    n_obs_Case = sum(response == 1, na.rm = TRUE),
+    n_obs_Control = sum(response == 0, na.rm = TRUE),
+    mean_Case = mean(expression[response == 1], na.rm = TRUE),
+    mean_Control = mean(expression[response == 0], na.rm = TRUE),
+    var_Case = var(expression[response == 1], na.rm = TRUE),
+    var_Control = var(expression[response == 0], na.rm = TRUE)
+  ) %>%
+  mutate(mean_diff = mean_Case - mean_Control) %>%
+  mutate(se_diff = sqrt( (var_Case/n_obs_Case) + (var_Control/n_obs_Control) )) %>%
+  mutate(t_welch = mean_diff / se_diff) %>%
+  arrange(desc(abs(t_welch))) # Ordena por el valor absoluto de t_welch
+
+knitr::kable(summary_overall[1:10, c("gene", "mean_diff", "t_welch")], 
+             col.names = c("Gene", "Obs_diff", "t_obs"))
+```
 
 ## \> Q4: Explore how pc1 and pc2 can effectively summarize the info of 500 gene expression measurements
 
