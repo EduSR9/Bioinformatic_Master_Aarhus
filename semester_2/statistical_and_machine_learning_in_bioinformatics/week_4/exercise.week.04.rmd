@@ -220,7 +220,7 @@ The response column is recoded for the logictic regression:\
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 getwd()
-tcgadf <- read_rds("datasets/TCGA_cancer_classification/miniTCGA.3349x4006.rds") 
+tcgadf <- read_rds("data/TCGA_cancer_classification/miniTCGA.3349x4006.rds") 
 
 dim(tcgadf) # check this should be 3349 4007
 names(tcgadf)[1:30]
@@ -346,6 +346,26 @@ knitr::kable(summary_overall[1:10, c("gene", "mean_diff", "t_welch")],
 
 ## \> Q4: Explore how pc1 and pc2 can effectively summarize the info of 500 gene expression measurements
 
+```{r}
+ggplot(tcgadf_clean, aes(x = pc1, y = pc2, color = as.factor(response))) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Dimensionality Reduction: PC1 vs PC2",
+       subtitle = "Summarizing gene expression to separate Normal (0) vs Tumor (1)",
+       x = "Principal Component 1", 
+       y = "Principal Component 2", 
+       color = "Tissue Type") +
+  theme_minimal() +
+  scale_color_manual(values = c("0" = "blue", "1" = "red"))
+
+# Fit a logistic regression using only the first two principal components
+pc_model <- glm(response ~ pc1 + pc2, data = tcgadf_clean, family = "binomial")
+
+# View the summary to see if pc1 and pc2 are statistically significant predictors
+summary(pc_model)
+```
+
+This statistical output confirms that your model is highly successful: the extremely low p-values `(<2e-``16`) prove that PC1 and PC2 are both highly significant predictors that effectively capture the biological signal from the original 500 genes. The substantial drop in deviance (from 1481.5 to 1036.9) indicates that these two synthetic variables drastically improve the model's ability to distinguish between normal and cancerous tissue, providing a robust classification without the risk of overfitting thousands of individual predictors.
+
 ## \> Q5: try and combine up to max 3 predictors to make your classification ..
 
 To start, by limiting the number of predictors, the model is more easy to "interpret". Later on we will go "bananas" and increase the number of predictors if it is sensible to do so (see cross validation and model selection inthe coming weeks )
@@ -356,13 +376,54 @@ Hint: you could try to use the `broom` package and use that to organize the resu
 
 Note that the statistics computed by glance are different for `glm()` objects than for `lm()` (e.g. deviance rather than R\^2 are reported). make sure you understand these terms and if in doubt ask your TA :)
 
+```{r}
+library(broom)
+
+# glm with the top 3 genes from Q3
+gene_model_3 <- glm(response ~ ANGPTL1.9068 + NR3C2.4306 + TMEM220.388335, 
+                    data = tcgadf_clean, 
+                    family = "binomial")
+
+# Use tidy() to look at the coefficients and p-values for each gene
+tidy(gene_model_3)
+
+# Use glance() to look at the overall model fit (Deviance and AIC)
+glance(gene_model_3)
+```
+
 ------------------------------------------------------------------------
+
+The first table confirms that three chosen genes are incredibly strong, independent predictors of tissue type. The extremely small **p-values** (all well below 0.05) indicate that each gene contributes significant predictive power to the model. Additionally, the negative **estimates** (coefficients) for all three genes mean that higher expression levels of ANGPTL1, NR3C2, and TMEM220 are strongly associated with a lower probability of the tissue being cancerous. Essentially, these genes are highly expressed in normal tissue and appear to be down-regulated or "turned off" in tumors.
+
+The second table reveals that this targeted 3-gene model drastically outperforms your previous Principal Component model. The **residual deviance** dropped all the way down to 539.9 (compared to 1036.9 in the PC model), and the **AIC** is nearly cut in half to 547.9 (down from 1042.9). Because lower values in both of these metrics indicate a better model fit with less error, this proves that selecting just a few highly informative, specific genes can provide a much sharper and more accurate classification than summarizing hundreds of genes into broader synthetic variables like PC1 and PC2.
 
 # Part 5. looking at model fit
 
 ##\> Q6: Make some visual presentation of the glm fit
 
 use `ggplot()` to produce the equivalent of figure 4.2 of the book for the logistic regression model you chose.
+
+```{r}
+# First, we reshape the data using pivot_longer so ggplot can read it easily
+plot_data_3genes <- tcgadf_clean %>%
+  select(response, ANGPTL1.9068, NR3C2.4306, TMEM220.388335) %>%
+  pivot_longer(cols = -response, names_to = "Gene", values_to = "Expression")
+
+# Now we plot it, adding 'facet_wrap' to split it into 3 panels
+ggplot(plot_data_3genes, aes(x = Expression, y = response)) +
+  geom_point(shape = "|", color = "orange", size = 4, alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), 
+              color = "dodgerblue", se = FALSE) +
+  
+  facet_wrap(~ Gene, scales = "free_x") + 
+  
+  labs(title = "Logistic Regression Fits for Top 3 Genes",
+       x = "Gene Expression Level",
+       y = "Probability of Tumor") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray") +
+  theme_classic()
+```
 
 Hint: if you still struggle with all the arcane options of `ggplot()` try this post :)
 
