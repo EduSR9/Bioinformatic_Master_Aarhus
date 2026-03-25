@@ -1,0 +1,204 @@
+---
+title: "Week 09 - regularized regression/classification"
+format:
+  html: 
+    embed-resources: true
+---
+
+# Learning goals
+
+* Normal linear regression is meaningsless with k > n (more predictors than samples)
+* Bias/Variance trade off. Overfitting is a problem with high dimensional data
+* Use cross validation to estimate test error
+* Try both lasso and ridge regression - and know the difference
+
+# Data - phenotype prediction from blood metabolomics
+
+We will work on public data where we try to predict two phenotypes of people - age and sex from different molecules in blood plasma.
+
+The data is a mix of LCMS, GCMS and NMR data and it has all been combined here. The different names of the compounds are not super interesting for the purpose of this exercise.
+
+## Data source
+
+Metabolite patterns predicting sex and age in
+participants of the Karlsruhe Metabolomics
+and Nutrition (KarMeN) study
+
+PLOS One
+
+https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0183228
+
+# Book labs
+
+Before proceeding - go to the book labs and go through 
+
+6.5.2 Ridge Regression and the Lasso
+
+then come back here.
+
+(Maybe you could just write your code here - of you like)
+
+And if you feel for it, you are welcome to go through the first part of the labs as well (subset selection etc).
+
+```{r}
+
+# Beginning of chapter 6 labs
+
+library(ISLR2)
+
+head(Hitters)
+
+Hitters <- na.omit(Hitters)
+
+```
+
+# Karmen analysis
+
+## Loading data
+
+```{r}
+
+library(tidyverse)
+
+df <- read_rds(file = "karmen_data.rds")
+
+```
+
+## Making a training/test split for all of us
+
+To make it easier for all of us, we share some code so we save 20% of the data for validation (the same data for all of us)
+
+```{r}
+
+set.seed(0)
+
+x <- model.matrix(age~., df)[, -1]
+y <- df$age
+
+df <- df %>%
+  mutate(set = sample(x=c("Training set", "Test set"), size = n(), replace = TRUE, prob = c(0.80,0.20))) %>%
+  select(set, everything())
+
+train <- which(df$set=="Training set")
+test <-  which(df$set=="Test set")
+
+```
+
+Now you have two vectors of row numbers called "train" and "test".
+
+# Data inspection
+
+## >Q1.1: How many predictors do we have in the data? (dimensions)
+
+
+--- 
+
+## >Q1.2: How are the predictor values distributed? (scaling)
+
+We will ignore any scaling requirements for now. But it's important that you can identify issues with data, e.g. are the data on different scales?
+
+The quick and dirty check is to check the distribution of all the values combined and also log transformed.
+
+
+--- 
+
+## >Q1.3: How is our response (age) distributed? (should we transform it?)
+
+We should check if the dataset is balanced or looks weird.
+
+Again, we will do nothing but we should check it.
+
+
+--- 
+
+## >Q1.4: Make a PCA plot of the data, with age as color.
+
+Do you see a pattern/tendency in the data? 
+
+
+--- 
+
+# Ridge regression
+
+## >Q2.1: Perform cross validated ridge regression on the training data, calculate the training and test RMSE.
+
+There are three error metrics that are commonly used for evaluating and reporting the performance of a regression model; they are: Mean Squared Error (MSE). Root Mean Squared Error (RMSE). Mean Absolute Error (MAE).
+
+Discuss what you expect BEFORE you do this. What do you expect of training and test RMSE?
+
+Also, make plots with the predicted vs. the observed age for both sets.
+
+
+--- 
+
+## >Q2.2: Find to top 10 molecules with the largest effect sizes
+
+
+Hint: again, check the book labs to get coefficients from the model.
+
+
+--- 
+
+# Lasso regression
+
+## >Q3.1: Perform cross validated lasso regression on the training data, calculate the training and test RMSE.
+
+Once you have the ridge regression up and running this should be pretty quick. Basically setting alpha=1 instead of alpha=0...
+
+
+--- 
+
+## >Q3.2: Find to top 10 molecules with the largest effect sizes
+
+Also: count how many coefficients are not zero.
+
+Hint: again, check the book labs to get coefficients from the model.
+
+
+--- 
+
+# Comparison of lasso and ridge
+
+## >Q4.1: Which method had lowest test RMSE?
+
+Discuss the training error (RMSE) differences between the two. What happened?
+
+## >Q4.2: What does it tell you? 
+
+So, think about if you expect all, some or few of the molecules to change with age. Is your expectation in line with what you observe?
+
+## >Q4.3: What about non linearity and interactions ?
+
+Do the chosen method allow for non-linear relations? What about interactions in the data?
+
+(We will come back to this dataset later on).
+
+## >Q4.3: What should we do? 
+
+We do actually want to use data very similar to this find biomarkers we can use for estimating the age of blood spots from crime scenes. 
+
+Which method would you prefer? Our goal is to find <25 target molecules, since we have super sensitive methods for measuring a few molecules with insane precision (targeted LCMS).
+
+You can read a little about the project here (in Danish - you can probably get google to translate it): 
+
+https://innovationsfonden.dk/da/i/historier/ny-retskemisk-metode-skal-afsloere
+
+# Bonus
+
+## >Q5: how robust are the error estimates for ridge and lasso if you have different train/test sizes?
+
+So... basically I'm curious to see how much your estimates changes from run to run as well as with the size of the train/test set.
+
+I the beginning of this exercise we set the training part of the data to be 80% and the test part to be 20%.
+
+What do you think will happen if we use e.g. 50:50 ? (Then we have less training data but more test data.)
+
+When we have MORE training data do you think the models becomes BETTER/WORSE at generalizing (test error)?
+
+When we have LESS test data do you think the test error estimate is MORE/LESS variable from run to run?
+
+If we had infinite traning and test data - what would you expect? (for this dataset)
+
+
+--- 
+
