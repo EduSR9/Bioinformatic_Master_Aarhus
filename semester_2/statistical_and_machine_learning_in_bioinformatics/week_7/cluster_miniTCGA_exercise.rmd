@@ -9,7 +9,7 @@ output:
     toc: true
 editor_options: 
   chunk_output_type: console
---- 
+---
 
 # Load data and packages
 
@@ -24,7 +24,7 @@ library(reshape2)  # for pivoting dataframes
 library(cluster)
 library(stats)
 
-df <- read_rds(file = "miniTCGA.3349x4006.rds") 
+df <- read_rds(file = "data/miniTCGA.3349x4006.rds")
 
 L <- dim(df)[1]
 TCGA <- df %>% filter(!is.na(response))
@@ -42,7 +42,6 @@ cat("dimensions of the data with HIGHLY VARIABLE features:",dim(dataTCGA_var),"\
 
 ```
 
-
 ```{r}
 umapTCGA <- umap(dataTCGA_var, metric = "euclidean", n_neighbors = 10)
 ```
@@ -51,9 +50,7 @@ umapTCGA <- umap(dataTCGA_var, metric = "euclidean", n_neighbors = 10)
 
 **To do: Now, plot the obtained UMAP and then cluster:**
 
-**- the data with variable features using k-means**
-**- the data with all features using k-means**
-**- the umap coordinates using k-means**
+**- the data with variable features using k-means** **- the data with all features using k-means** **- the umap coordinates using k-means**
 
 **Choose the value of k=8 and use the function `stats::kmeans`. Also, time how long it does take for each k-means to run, which can be done with `system.time({command to run here})["elapsed"]`.**
 
@@ -73,50 +70,213 @@ ggplot(df, aes(x = UMAP_1, y = UMAP_2, color = color_value)) +
 
 We apply k-means to UMAP and data matrices, print elapsed time and plot clusterings.
 
-```{.r}
-#YOUR CODE HERE
+```{r}
+
+time_var <- system.time({
+  kmeans_var <- stats::kmeans(dataTCGA_var, centers = 8)
+})["elapsed"]
+cat("Time k means (high variance)", time_var, "seconds.")
+
+time_all <- system.time({
+  kmeans_all <- stats::kmeans(dataTCGA, centers = 8)
+})["elapsed"]
+cat("Time k means (all)", time_all, "seconds.")
+
+time_umap <- system.time({
+  kmeans_umap <- stats::kmeans(umapTCGA, centers = 8)
+})["elapsed"]
+cat("Time k means (all)", time_umap, "seconds.")
+
+df$cluster_var <- as.factor(kmeans_var$cluster)
+df$cluster_all <- as.factor(kmeans_all$cluster)
+df$cluster_umap <- as.factor(kmeans_umap$cluster)
+
+plot_var <- ggplot(df, aes(x = UMAP_1, y = UMAP_2, color = cluster_var)) +
+  geom_point(size = 3, alpha = 0.5) +
+  labs(title = "K-means Clustering (Highly Variable Features)", x = "UMAP_1", y = "UMAP_2") +
+  theme_minimal()
+
+plot_all <- ggplot(df, aes(x = UMAP_1, y = UMAP_2, color = cluster_all)) +
+  geom_point(size = 3, alpha = 0.5) +
+  labs(title = "K-means Clustering (All Features)", x = "UMAP_1", y = "UMAP_2") +
+  theme_minimal()
+
+plot_umap <- ggplot(df, aes(x = UMAP_1, y = UMAP_2, color = cluster_umap)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering (UMAP Coordinates)", x = "UMAP_1", y = "UMAP_2") +
+  theme_minimal()
+
+library(patchwork)
+plot_var + plot_all + plot_umap
+
 ```
 
-**To do: Can you** 
-**- explain the difference in time executions between the three kmeans. Are those time in proportions to each other by some factor?**
-**- notice any difference in the clusterings?**
+**To do: Can you** **- explain the difference in time executions between the three kmeans. Are those time in proportions to each other by some factor?** **- notice any difference in the clusterings?**
+
+The differences in execution times between the three k-means runs are quite drastic, with the full data matrix taking the longest due to the high computational cost of calculating distances across 4006 features. In contrast, the k-means on UMAP coordinates was almost instantaneous because the algorithm only had to process two dimensions. These times are not linearly proportional but reflect the "curse of dimensionality," where increasing the number of features significantly scales up the mathematical effort required for each iteration. Regarding the clusterings, I noticed that the UMAP-based results look much "cleaner" with perfectly defined islands, while the clusterings based on the full or variable features show more overlapping colors on the plot. This happens because the latter are making decisions in a complex high-dimensional space, and what we see is just a 2D projection that can't perfectly capture those 4006D boundaries.
 
 **To Do: From now on, we abandon the data matrix with all features, and we used only the reduced matrix and the UMAP matrix. Try to calculate the silhouette score of each of the three clusterings for comparison. This is easily done with the function `silhouette`. The result of that function can be used in the function `plot` directly to print the results. Use the output of `silhouette` to calculate also the average silhouette score, which you can use to have an idea of how good the clustering is.**
 
-```{.r}
- #Your code here
-```
+```{r}
+dist_var <- dist(dataTCGA_var)
+dist_all <- dist(dataTCGA)
+dist_umap <- dist(umapTCGA)
 
+sil_var <- silhouette(kmeans_var$cluster, dist_var)
+sil_all <- silhouette(kmeans_all$cluster, dist_all)
+sil_umap <- silhouette(kmeans_umap$cluster, dist_umap)
+
+plot(sil_var,
+     main = "Silhouette Plot - K-means on High Variance",
+     col = 1:8,
+     border = NA,
+     cex.names = 1)
+
+plot(sil_all, main = "Silhouette Plot - K-means on All dimensions",
+     col = 1:8,
+     border = NA,
+     cex.names = 1)
+
+plot(sil_umap, main = "Silhouette Plot - K-means on UMAP",
+     col = 1:8,
+     border = NA,
+     cex.names = 1)
+```
 
 The silhouette for the data should be pretty bad compared to the one in the UMAP. However both clusterings are not optimal, because in both silhouettes there is a rapid decrease.
 
-**To do: Can you hypothesize two causes for why this might happen?** 
+**To do: Can you hypothesize two causes for why this might happen?**
+
+Here is a paragraph you can use for your report that explains the results and the concept of the "rapid decrease" in the silhouette plots:
+
+The silhouette scores reveal a significant difference in clustering quality between the two methods, with the UMAP-based approach achieving a much higher average width (0.73) than the high-variance features (0.18). This discrepancy occurs because the high-dimensional data suffers from heavy overlap , where points are often closer to neighboring clusters than their own, leading to low or even negative scores. However, the "rapid decrease" observed in the silhouette bars of both plots suggests that even the UMAP clustering is not fully optimal. This steep drop-off indicates that while each cluster has a small core of very well-assigned points, the majority of the samples are located near the fuzzy boundaries 🌫️ of the groups. This could be hypothesized to be caused by either choosing an incorrect number of clusters (k=8), which forces the algorithm to split natural groups, or by the presence of non-spherical data shapes that k-means struggles to capture accurately.
 
 **To do: Try various approaches as discussed in class for the k-means to address your hypothesized issues.**
 
+```{r}
+# 1. Choose the range of k values to test
+k_range <- 2:10
+# The optimization loop with kmeans
+for (i in seq_along(k_range)) {
+  k <- k_range[i]
+  
+  # Run k-means with multiple initializations for stability
+  km_result <- kmeans(umapTCGA, centers = k, nstart = 25)
+  
+  # Calculate silhouette scores 
+  sil_analysis <- silhouette(km_result$cluster, dist_umap)
+  
+  # Store the average width 
+  avg_sil_scores[i] <- mean(sil_analysis[, 3])
+}
 
-```{.r}
-#YOUR CODE HERE
+results <- data.frame(k = k_range, avg_silhouette = avg_sil_scores)
+
+print(results)
+
+km_final <- kmeans(umapTCGA, centers = 5, nstart = 25)
+par(mfrow = c(1, 2))
+sil_final_km <- silhouette(km_final$cluster, d_umap)
+plot(sil_final_km, main = "Silhouette Plot - K-means on UMAP, optimize",
+     col = 1:5,
+     border = NA,
+     cex.names = 1)
+
+plot(umapTCGA, 
+     col = km_final$cluster, 
+     pch = 19, cex = 0.5,
+     main = "Clusters in UMAP (K-means)",
+     xlab = "UMAP 1", ylab = "UMAP 2")
+
+# The optimization loop with clara
+for (i in seq_along(k_range)) {
+  k <- k_range[i]
+  
+  # Run clara with multiple initializations for stability
+  clara_result <- clara(umapTCGA, k)
+
+  
+  # Calculate silhouette scores 
+  sil_analysis <- silhouette(clara_result$cluster, dist_umap)
+  
+  # Store the average width 
+  avg_sil_scores[i] <- mean(sil_analysis[, 3])
+}
+
+results <- data.frame(k = k_range, avg_silhouette = avg_sil_scores)
+
+print(results)
+
+clara_final <- clara(umapTCGA, 3)
+par(mfrow = c(1, 2))
+sil_final_clara <- silhouette(clara_final$cluster, d_umap)
+plot(sil_final_clara, main = "Silhouette Plot - CLARA on UMAP, optimize",
+     col = 1:3,
+     border = NA,
+     cex.names = 1)
+
+plot(umapTCGA, 
+     col = clara_final$cluster, 
+     pch = 19, cex = 0.5,
+     main = "Clusters in UMAP (clara)",
+     xlab = "UMAP 1", ylab = "UMAP 2")
+
+
+par(mfrow = c(1, 1))
+
+# Hierarchical Clustering Dendrogram of UMAP
+res_hc <- hclust(d_umap, method = "average")
+
+plot(res_hc, 
+     labels = FALSE,        # Removes the black block of names
+     hang = -1,             # Aligns all "leaves" at the bottom for a cleaner look
+     main = "UMAP Dendrogram", 
+     sub = "Method: Average Linkage",
+     xlab = "Samples", 
+     ylab = "Height (Distance)")
+
+# Rectangles to highlight where the 5 clusters would be
+rect.hclust(res_hc, k = 5, border = "red")
+
+# 2. Run DBSCAN
+library(dbscan)
+# We'll start with some "tip" values for eps and minPts
+db_result <- dbscan(umapTCGA, eps = 0.5, minPts = 5)
+
+# 3. Check the results
+print(db_result)
+
+plot_data <- data.frame(umapTCGA, Cluster = as.factor(db_result$cluster))
+
+ggplot(plot_data, aes(x = X1, y = X2, color = Cluster)) +
+  geom_point(alpha = 1) +
+  theme_minimal() +
+  labs(title = "Clustering DBSCAN over UMAP",
+       color = "Cluster")
+km_result <- kmeans(umapTCGA, centers = 9, nstart = 25)
+sil_analysis <- silhouette(km_result$cluster, dist_umap)
+mean(sil_analysis[, 3])
+
 ```
 
-The UMAP results should be clearly better even after ddressing the issues. 
+The UMAP results should be clearly better even after addressing the issues.
 
 **To do: Based on the results you obtained with kmeans, do you think the kmeans is a good algorithm to cluster a complex dataset where clusters have different densities and are affected by noise?**
 
 **To do: Try one of the algorithms mentioned in class, or another one you know. Look at the lecture slides to find the names. Then, evaluate the results with silhouette scores and plotting the UMAP for visualization. Note: Some methods might need to install a package, because not contained in the package `cluster`.**
 
-```{.r}
+``` r
 #YOUR CODE HERE
 ```
 
 **To do: try the spectral clustering based on the eigenvector of the dissimilarity matrix of the data (last lecture slide). Take the code [from this example](https://rpubs.com/gargeejagtap/SpectralClustering) and adapt it to your UMAP matrix after reading the explanations on the webpage, which is written nicely. Evaluate the clustering you obtain: you should see it does not improve much, and in fact does a worse job at clustering than kmeans for our application.**
 
-```{.r}
+``` r
 #YOUR CODE HERE
 ```
 
 **To do, optional: try to calculate the matrix S above with a different distance in `dist`, or evaluate `dist` into a gaussian distribution where you can choose the standard deviation. See how results change for your clustering.**
 
-```{.r}
+``` r
 #YOUR CODE HERE
 ```
