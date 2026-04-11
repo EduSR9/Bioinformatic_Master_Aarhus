@@ -4,7 +4,7 @@ The Aarhus University MSc in Bioinformatics is an interdisciplinary program host
 
 This repository contains coursework and projects organized by semester.
 
-## 🛠️ Technical Toolkit
+## Technical Toolkit
 
 | Category | Tools & Technologies |
 | :--- | :--- |
